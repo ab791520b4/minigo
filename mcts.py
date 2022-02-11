@@ -306,7 +306,7 @@ class MCTSNode(object):
             p_delta), where=prior != 0)
         # Dump out some statistics
         output = []
-        output.append("{q:.4f}\n".format(q=self.Q))
+        output.append("{q}\n".format(q=list(map('{:.4f}'.format, self.Q)) if hasattr(self.Q, '__iter__') else self.Q))
         output.append(self.most_visited_path())
         output.append(
             "move : action    Q     U     P   P-Dir    N  soft-N  p-delta  p-rel")
