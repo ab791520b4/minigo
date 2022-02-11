@@ -16,19 +16,19 @@
 python3 -m pip install -r minigui/requirements.txt
 
 # For Raspberry Pi
-if grep -q "Raspberry Pi" /sys/firmware/devicetree/base/model; then
+if [ -e /sys/firmware/devicetree/base/model ] && grep -q "Raspberry Pi" /sys/firmware/devicetree/base/model; then
   sudo apt-get install chromium xautomation
 # For DevBoard
-elif grep -q "MX8MQ" /sys/firmware/devicetree/base/model; then
+elif [ -e /sys/firmware/devicetree/base/model ] && grep -q "MX8MQ" /sys/firmware/devicetree/base/model; then
   sudo apt-get install chromium xautomation
 else
   echo "Generic Linux system"
 fi
 
 cat << EOF | python3
-try: import edgetpu
+try: import pycoral
 except ImportError: 
-  print("\nNo EdgeTPU libs found.")
-  print("Follow instructions at https://coral.withgoogle.com/tutorials/accelerator/ to install the EdgeTPU")
+  print("\nNo PyCoral libs found.")
+  print("Follow instructions at https://coral.ai/docs/accelerator/get-started/ to get started")
 EOF
 
