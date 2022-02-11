@@ -21,7 +21,8 @@ For more information see https://coral.withgoogle.com
 import numpy as np
 import features as features_lib
 import go
-from edgetpu.basic.basic_engine import BasicEngine  # pylint: disable=import-error
+from pycoral.utils import edgetpu
+from pycoral.adapters import common
 
 
 def extract_agz_features(position):
@@ -32,17 +33,25 @@ class DualNetworkEdgeTpu():
     """DualNetwork implementation for Google's EdgeTPU."""
 
     def __init__(self, save_file):
-        self.engine = BasicEngine(save_file)
+        self.interpreter = edgetpu.make_interpreter(save_file)
+        self.interpreter.allocate_tensors()
         self.board_size = go.N
         self.output_policy_size = self.board_size**2 + 1
 
-        input_tensor_shape = self.engine.get_input_tensor_shape()
+        if len(self.interpreter.get_input_details()) != 1:
+            raise RuntimeError(
+                'Invalid number of input tensors {}. Expected: {}'.format(
+                    len(self.interpreter.get_input_details()), 1))
+
+        input_tensor_shape = self.interpreter.get_input_details()[0]['shape']
+
         expected_input_shape = [1, self.board_size, self.board_size, 17]
         if not np.array_equal(input_tensor_shape, expected_input_shape):
             raise RuntimeError(
                 'Invalid input tensor shape {}. Expected: {}'.format(
                     input_tensor_shape, expected_input_shape))
-        output_tensors_sizes = self.engine.get_all_output_tensors_sizes()
+
+        output_tensors_sizes = [output_tensor_detail['shape'].prod() for output_tensor_detail in self.interpreter.get_output_details()]
         expected_output_tensor_sizes = [self.output_policy_size, 1]
         if not np.array_equal(output_tensors_sizes,
                               expected_output_tensor_sizes):
@@ -63,11 +72,19 @@ class DualNetworkEdgeTpu():
         for state in processed:
             assert state.shape == (self.board_size, self.board_size,
                                    17), str(state.shape)
-            result = self.engine.RunInference(state.flatten())
-            # If needed you can get the raw inference time from the result object.
-            # inference_time = result[0] # ms
-            policy_output = result[1][0:self.output_policy_size]
-            value_output = result[1][-1]
+            edgetpu.run_inference(self.interpreter, state.flatten())
+            output_details = self.interpreter.get_output_details()
+
+            # dequantize output tensor #0 (policy output)
+            output_data = self.interpreter.tensor(output_details[0]['index'])().flatten()
+            scale, zero_point = output_details[0]['quantization']
+            policy_output = scale * (output_data.astype(np.int64) - zero_point)
+
+            # dequantize output tensor #1 (value output)
+            output_data = self.interpreter.tensor(output_details[1]['index'])().flatten()
+            scale, zero_point = output_details[1]['quantization']
+            value_output = scale * (output_data.astype(np.int64) - zero_point)
+
             probabilities.append(policy_output)
             values.append(value_output)
         return probabilities, values
