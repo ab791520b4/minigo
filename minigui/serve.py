@@ -233,7 +233,7 @@ def main(unused_argv):
         connections[name] = connection
 
     print("Starting server")
-    socketio.run(app, port=FLAGS.port, host=FLAGS.host)
+    socketio.run(app, port=FLAGS.port, host=FLAGS.host, allow_unsafe_werkzeug=True)
 
 
 if __name__ == "__main__":
